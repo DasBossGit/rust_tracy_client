@@ -110,6 +110,7 @@ fn build_tracy_client() {
                 if tool.is_like_msvc() {
                     // MSVC static runtime
                     builder.flag("/MT");
+                    
                 } else if tool.is_like_gnu() {
                     // MinGW static runtime
                     builder.flag("-static");
