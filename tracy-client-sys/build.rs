@@ -117,7 +117,11 @@ fn build_tracy_client() {
                     builder.flag("-static-libgcc");
                     builder.flag("-static-libstdc++");
                     // Disable stack protector to avoid stack smashing error
-                    builder.flag("-fno-stack-protector");
+                    builder
+                        .flag("-fno-stack-check")
+                        .flag("-fno-stack-protector")
+                        .flag("-fno-sanitize=all")
+                        .flag("--verbose");
                     println!("cargo:warning=Using flag -static for MinGW. This is not recommended, use -shared instead.");
                 }
             }
