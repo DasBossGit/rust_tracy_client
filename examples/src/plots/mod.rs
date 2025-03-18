@@ -1,13 +1,32 @@
+use tracing_appender::*;
+use tracing_error::*;
+use tracing_forest::*;
+use tracing_subscriber::*;
+use tracing_tracy::*;
+
+use ::tracing_forest::util::LevelFilter;
+use ::tracing_subscriber::{fmt::Layer, registry, Registry};
 use rand::Rng;
 use std::thread::sleep;
 use std::time::Duration;
+use tracing::instrument;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{filter, fmt, prelude::*, reload};
 use tracy_client::{Client, PlotConfiguration, PlotFormat, PlotLineStyle, PlotName};
 
 // Plots you know statically can be defined freely like so
 const PLOT_PLAYER_COUNT: PlotName = tracy_client::plot_name!("Player Count");
 const PLOT_DISK_SPACE: PlotName = tracy_client::plot_name!("Disk Space");
 
+#[tracing::instrument]
 pub fn main() {
+    let layer = Layer::new().pretty().with_ansi(true);
+    let filtered_layer = fmt::Layer::pretty(layer).with_filter(LevelFilter::ERROR);
+    let (filtered_layer, reload_handle) = reload::Layer::new(filtered_layer);
+    let tracy_layer = tracing_tracy::DefaultConfig::default();
+    let tracy_layer = tracing_tracy::TracyLayer::new(tracy_layer);
+    registry().with(filtered_layer).with(tracy_layer).init();
+
     let client = Client::start();
     let mut rng = rand::thread_rng();
 
