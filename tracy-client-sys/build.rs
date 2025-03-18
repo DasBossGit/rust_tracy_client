@@ -110,7 +110,7 @@ fn build_tracy_client() {
                 if tool.is_like_msvc() {
                     // MSVC static runtime
                     builder.flag("/MT");
-                    
+                    println!("cargo:warning=Using flag /MT for MSVC. This is not recommended, use /MD instead.");
                 } else if tool.is_like_gnu() {
                     // MinGW static runtime
                     builder.flag("-static");
@@ -118,6 +118,7 @@ fn build_tracy_client() {
                     builder.flag("-static-libstdc++");
                     // Disable stack protector to avoid stack smashing error
                     builder.flag("-fno-stack-protector");
+                    println!("cargo:warning=Using flag -static for MinGW. This is not recommended, use -shared instead.");
                 }
             }
         }
