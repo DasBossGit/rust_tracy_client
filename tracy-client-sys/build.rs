@@ -104,26 +104,19 @@ fn build_tracy_client() {
             if tool.is_like_gnu() || tool.is_like_clang() {
                 // https://github.com/rust-lang/cc-rs/issues/855
                 builder.flag("-std=c++11");
-            }
-            #[cfg(all(target_os = "windows"))]
-            {
-                if tool.is_like_msvc() {
-                    // MSVC static runtime
-                    builder.flag("/MT");
-                    println!("cargo:warning=Using flag /MT for MSVC. This is not recommended, use /MD instead.");
-                } else if tool.is_like_gnu() {
-                    // MinGW static runtime
-                    builder.flag("-static");
-                    builder.flag("-static-libgcc");
-                    builder.flag("-static-libstdc++");
-                    // Disable stack protector to avoid stack smashing error
-                    builder
-                        .flag("-fno-stack-check")
-                        .flag("-fno-stack-protector")
-                        .flag("-fno-sanitize=all")
-                        .flag("--verbose");
-                    println!("cargo:warning=Using flag -static for MinGW. This is not recommended, use -shared instead.");
+
+                // Special handling for MinGW to avoid stack smashing
+                if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("gnu") {
+                    println!("cargo:warning=Applying MinGW-specific flags");
+                    builder.flag("-fno-stack-protector");
+                    // Explicitly define these to avoid problematic features
+                    builder.define("TRACY_NO_SAMPLING", None);
+                    builder.define("TRACY_NO_VERIFY", None);
+                    builder.define("TRACY_NO_CRASH_HANDLER", None);
                 }
+            }
+            if tool.is_like_msvc() {
+                builder.flag("/MT"); // Static linking for MSVC
             }
         }
         let _ = builder.try_flags_from_environment("TRACY_CLIENT_SYS_CXXFLAGS");
