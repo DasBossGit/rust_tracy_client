@@ -105,10 +105,20 @@ fn build_tracy_client() {
                 // https://github.com/rust-lang/cc-rs/issues/855
                 builder.flag("-std=c++11");
             }
-        }
-        #[cfg(all(target_os = "windows"))]
-        {
-            builder.flag("-MT");
+            #[cfg(all(target_os = "windows"))]
+            {
+                if tool.is_like_msvc() {
+                    // MSVC static runtime
+                    builder.flag("/MT");
+                } else if tool.is_like_gnu() {
+                    // MinGW static runtime
+                    builder.flag("-static");
+                    builder.flag("-static-libgcc");
+                    builder.flag("-static-libstdc++");
+                    // Disable stack protector to avoid stack smashing error
+                    builder.flag("-fno-stack-protector");
+                }
+            }
         }
         let _ = builder.try_flags_from_environment("TRACY_CLIENT_SYS_CXXFLAGS");
         builder.compile("libtracy-client.a");
