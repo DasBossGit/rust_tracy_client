@@ -108,7 +108,7 @@ fn build_tracy_client() {
         }
         #[cfg(all(target_os = "windows"))]
         {
-            builder.flag("/MT");
+            builder.flag("-MT");
         }
         let _ = builder.try_flags_from_environment("TRACY_CLIENT_SYS_CXXFLAGS");
         builder.compile("libtracy-client.a");
