@@ -1,61 +1,68 @@
 [package]
-name = "tracy-client-sys"
-version = "0.24.3" # AUTO-BUMP
-authors = ["Simonas Kazlauskas <tracy-client-sys@kazlauskas.me>"]
-build = "build.rs"
-license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
-edition.workspace = true
-rust-version.workspace = true
-readme = "README.mkd"
-repository.workspace = true
-homepage.workspace = true
-documentation = "https://docs.rs/tracy-client-sys"
-description = """
+    authors = ["Simonas Kazlauskas <tracy-client-sys@kazlauskas.me>"]
+    build = "build.rs"
+    description = """
 Low level bindings to the client libraries for the Tracy profiler
 """
+    documentation = "https://docs.rs/tracy-client-sys"
+    edition.workspace = true
+    homepage.workspace = true
+    license = "(MIT OR Apache-2.0) AND BSD-3-Clause"
+    name = "tracy-client-sys"
+    readme = "README.mkd"
+    rust-version.workspace = true
+    version = "0.24.3" # AUTO-BUMP
 
 [[test]]
-name = "tests"
-path = "tests.rs"
-harness = false
-required-features = ["fibers"]
+    harness           = false
+    name              = "tests"
+    path              = "tests.rs"
+    required-features = ["fibers"]
 
 [dependencies]
 
 [target."cfg(windows)".dependencies]
-windows-targets = ">=0.48, <0.53"
+    windows-targets = ">=0.48, <0.53"
 
 [build-dependencies]
-cc = { version = "1.0.83", default-features = false }
+    cc = { version = "1.0.83", default-features = false }
 
 [features]
-# Refer to FEATURES.mkd for documentation on features.
-default = [ "enable", "system-tracing", "context-switch-tracing", "sampling", "code-transfer",
-            "broadcast", "callstack-inlines", "crash-handler" ]
-enable = []
-fibers = []
-system-tracing = []
-context-switch-tracing = []
-sampling = []
-code-transfer = []
-broadcast = []
-only-localhost = []
-only-ipv4 = []
-timer-fallback = []
-ondemand = []
-manual-lifetime = ["delayed-init"]
-delayed-init = []
-callstack-inlines = []
-flush-on-exit = []
-demangle = []
-verify = []
-debuginfod = []
-crash-handler = []
+    # Refer to FEATURES.mkd for documentation on features.
+    broadcast = []
+    callstack-inlines = []
+    code-transfer = []
+    context-switch-tracing = []
+    crash-handler = []
+    debuginfod = []
+    default = [
+        "broadcast",
+        "callstack-inlines",
+        "code-transfer",
+        "context-switch-tracing",
+        "crash-handler",
+        "enable",
+        "sampling",
+        "system-tracing",
+    ]
+    delayed-init = []
+    demangle = []
+    enable = []
+    fibers = []
+    flush-on-exit = []
+    manual-lifetime = ["delayed-init"]
+    ondemand = []
+    only-ipv4 = []
+    only-localhost = []
+    sampling = []
+    system-tracing = []
+    timer-fallback = []
+    verify = []
 
 [package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "tracy_client_sys_docs"]
+    all-features = true
+    rustdoc-args = ["--cfg", "tracy_client_sys_docs"]
 
 [lints.rust.unexpected_cfgs]
-level = "warn"
-check-cfg = ['cfg(tracy_client_sys_docs)']
+    check-cfg = ['cfg(tracy_client_sys_docs)']
+    level     = "warn"

@@ -9,7 +9,6 @@ Examples for using `tracy-client` in a wgpu application
     name = "tracy-client-examples"
     publish = false
     readme = "README.mkd"
-    repository.workspace = true
     rust-version.workspace = true
     version = "0.17.4" # AUTO-BUMP
 

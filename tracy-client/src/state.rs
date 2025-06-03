@@ -32,7 +32,6 @@ impl Client {
         #[cfg(all(feature = "enable", not(feature = "manual-lifetime")))]
         return Self(());
     }
-
     /// Obtain a client handle, but only if the client is already running.
     #[must_use]
     pub fn running() -> Option<Self> {
@@ -42,6 +41,7 @@ impl Client {
             None
         }
     }
+
 
     /// Is the client already running?
     pub fn is_running() -> bool {

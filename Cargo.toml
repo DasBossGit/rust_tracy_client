@@ -1,15 +1,14 @@
 [workspace]
-members = [
-    "tracy-client-sys",
-    "tracy-client",
-    "tracing-tracy",
-    "examples",
-]
-resolver = "2"
+    members = [
+        "examples",
+        "tracing-tracy",
+        "tracy-client",
+        "tracy-client-sys",
+    ]
+    resolver = "2"
 
 [workspace.package]
-edition = "2021"
-repository = "https://github.com/nagisa/rust_tracy_client"
-homepage = "https://github.com/nagisa/rust_tracy_client"
-license = "MIT/Apache-2.0"
-rust-version = "1.70.0"
+    edition      = "2021"
+    homepage     = "https://github.com/nagisa/rust_tracy_client"
+    license      = "MIT/Apache-2.0"
+    rust-version = "1.70.0"
