@@ -2,6 +2,7 @@
 #include <new>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 #include "TracyCallstack.hpp"
 #include "TracyDebug.hpp"
 #include "TracyFastVector.hpp"
@@ -369,6 +370,64 @@ ModuleCache* LoadSymbolsForModuleAndCache( const char* imageName, uint32_t image
     return cachedModule;
 }
 
+static bool IsValidSymbolLoadableDriver(const char* baseName, const char* fileName) {
+    // Filter synthetic crash dump drivers
+    if (strncmp(baseName, "dump_", 5) == 0) {
+        return false;
+    }
+
+    // Filter NT device namespace paths without Win32 equivalents
+    if (strncmp(fileName, "\\??\\", 4) == 0) {
+        // Check if the resolved path exists
+        char resolvedPath[MAX_PATH] = {0};
+        strcpy(resolvedPath, fileName + 4);  // Skip \\??\
+
+        DWORD attributes = GetFileAttributesA(resolvedPath);
+        return (attributes != INVALID_FILE_ATTRIBUTES);
+    }
+
+    // Handle SystemRoot resolution with existence validation
+    if (strncmp(fileName, "\\SystemRoot\\", 12) == 0) {
+        char windir[MAX_PATH] = {0};
+        if (!GetWindowsDirectoryA(windir, sizeof(windir))) {
+            strcpy(windir, "c:\\windows");
+        }
+
+        char fullPath[MAX_PATH] = {0};
+        strcpy(fullPath, windir);
+        strcat(fullPath, fileName + 11);  // Skip \SystemRoot
+
+        DWORD attributes = GetFileAttributesA(fullPath);
+        return (attributes != INVALID_FILE_ATTRIBUTES);
+    }
+
+    return true;  // Standard paths assumed valid
+}
+
+static void ResolveDriverPath(const char* ntPath, char* resolvedPath, size_t bufferSize) {
+    if (strncmp(ntPath, "\\SystemRoot\\", 12) == 0) {
+        static char cachedWinDir[MAX_PATH] = {0};
+        static bool winDirCached = false;
+
+        if (!winDirCached) {
+            if (!GetWindowsDirectoryA(cachedWinDir, sizeof(cachedWinDir))) {
+                strcpy(cachedWinDir, "c:\\windows");
+            }
+            winDirCached = true;
+        }
+
+        snprintf(resolvedPath, bufferSize, "%s%s", cachedWinDir, ntPath + 11);
+    }
+    else if (strncmp(ntPath, "\\??\\", 4) == 0) {
+        strncpy(resolvedPath, ntPath + 4, bufferSize - 1);
+        resolvedPath[bufferSize - 1] = '\0';
+    }
+    else {
+        strncpy(resolvedPath, ntPath, bufferSize - 1);
+        resolvedPath[bufferSize - 1] = '\0';
+    }
+}
+
 void InitCallstack()
 {
 #ifndef TRACY_SYMBOL_OFFLINE_RESOLVE
@@ -400,51 +459,84 @@ void InitCallstack()
     LPVOID dev[4096];
     if( initTimeModuleLoad && EnumDeviceDrivers( dev, sizeof(dev), &needed ) != 0 )
     {
-        char windir[MAX_PATH];
+
+
+        char symbolsearchpath[MAX_PATH] = { 0 };
+
+        if( !SymGetSearchPath( GetCurrentProcess(), symbolsearchpath, sizeof( symbolsearchpath ) ) )
+        {
+            TracyDebug( "TRACY: SymGetSearchPath failed with error %lu\n", GetLastError() );
+            symbolsearchpath[0] = '\0';
+        }
+        else
+        {
+            TracyDebug( "TRACY: SymGetSearchPath returned '%s'\n", symbolsearchpath );
+        }
+
+        char windir[MAX_PATH] = { 0 };
         if( !GetWindowsDirectoryA( windir, sizeof( windir ) ) ) memcpy( windir, "c:\\windows", 11 );
         const auto windirlen = strlen( windir );
 
         const auto sz = needed / sizeof( LPVOID );
         s_krnlCache = (KernelDriver*)tracy_malloc( sizeof(KernelDriver) * sz );
-        int cnt = 0;
-        for( size_t i=0; i<sz; i++ )
-        {
-            char fn[MAX_PATH];
-            const auto len = GetDeviceDriverBaseNameA( dev[i], fn, sizeof( fn ) );
-            if( len != 0 )
-            {
-                auto buf = (char*)tracy_malloc_fast( len+3 );
-                buf[0] = '<';
-                memcpy( buf+1, fn, len );
-                memcpy( buf+len+1, ">", 2 );
-                s_krnlCache[cnt] = KernelDriver { (uint64_t)dev[i], buf };
 
-                const auto len = GetDeviceDriverFileNameA( dev[i], fn, sizeof( fn ) );
-                if( len != 0 )
-                {
-                    char full[MAX_PATH];
-                    char* path = fn;
 
-                    if( memcmp( fn, "\\SystemRoot\\", 12 ) == 0 )
-                    {
-                        memcpy( full, windir, windirlen );
-                        strcpy( full + windirlen, fn + 11 );
-                        path = full;
-                    }
+        // Pre-allocation for maximum possible valid drivers
+        std::vector<size_t> validDriverIndices;
+        validDriverIndices.reserve(sz);
 
-                    DbgHelpLoadSymbolsForModule( path, (DWORD64)dev[i], 0 );
+        // First pass: identify valid drivers without filesystem operations
+        for(size_t i = 0; i < sz; i++) {
+            char baseName[MAX_PATH] = {0};
+            char fileName[MAX_PATH] = {0};
 
-                    const auto psz = strlen( path );
-                    auto pptr = (char*)tracy_malloc_fast( psz+1 );
-                    memcpy( pptr, path, psz );
-                    pptr[psz] = '\0';
-                    s_krnlCache[cnt].path = pptr;
-                }
+            const auto baseNameLen = GetDeviceDriverBaseNameA(dev[i], baseName, sizeof(baseName));
+            if (baseNameLen == 0) continue;
 
-                cnt++;
+            const auto fileNameLen = GetDeviceDriverFileNameA(dev[i], fileName, sizeof(fileName));
+            if (fileNameLen == 0) continue;
+
+            // Semantic filtering before any filesystem operations
+            if (IsValidSymbolLoadableDriver(baseName, fileName)) {
+                validDriverIndices.push_back(i);
             }
         }
-        s_krnlCacheCnt = cnt;
+
+
+        // Second pass: process only validated drivers
+    int cnt = 0;
+    for (size_t idx : validDriverIndices) {
+        char baseName[MAX_PATH] = {0};
+        char fileName[MAX_PATH] = {0};
+
+        const auto baseNameLen = GetDeviceDriverBaseNameA(dev[idx], baseName, sizeof(baseName));
+        const auto fileNameLen = GetDeviceDriverFileNameA(dev[idx], fileName, sizeof(fileName));
+
+        // Driver name formatting for cache
+        auto buf = (char*)tracy_malloc_fast(baseNameLen + 3);
+        buf[0] = '<';
+        memcpy(buf + 1, baseName, baseNameLen);
+        memcpy(buf + baseNameLen + 1, ">", 2);
+
+        s_krnlCache[cnt] = KernelDriver{(uint64_t)dev[idx], buf};
+
+        // Path resolution and symbol loading
+        char fullPath[MAX_PATH] = {0};
+        ResolveDriverPath(fileName, fullPath, sizeof(fullPath));
+
+        DbgHelpLoadSymbolsForModule(fullPath, (DWORD64)dev[idx], 0);
+
+        // Path storage
+        const auto pathLen = strlen(fullPath);
+        auto pathPtr = (char*)tracy_malloc_fast(pathLen + 1);
+        memcpy(pathPtr, fullPath, pathLen);
+        pathPtr[pathLen] = '\0';
+        s_krnlCache[cnt].path = pathPtr;
+
+        cnt++;
+    }
+
+    s_krnlCacheCnt = cnt;
         std::sort( s_krnlCache, s_krnlCache + s_krnlCacheCnt, []( const KernelDriver& lhs, const KernelDriver& rhs ) { return lhs.addr > rhs.addr; } );
     }
 
