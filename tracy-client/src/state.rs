@@ -28,8 +28,7 @@ impl Client {
         #[cfg(not(feature = "enable"))]
         return Self(());
         #[cfg(all(feature = "enable", feature = "manual-lifetime"))]
-        return Self(());
-        //return manual_lifetime::start();
+        return manual_lifetime::start();
         #[cfg(all(feature = "enable", not(feature = "manual-lifetime")))]
         return Self(());
     }
